@@ -1,0 +1,48 @@
+version: "3.8"
+
+networks:
+  # public: {}
+  # private:
+  #   internal: true
+  spark_network:
+    driver: bridge
+services:
+  master:
+    image: spark:3.5.7
+    container_name: master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_NO_DAEMONIZE=1
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    networks:
+      - spark_network
+  
+  worker_1:
+    image: spark:3.5.7
+    container_name: worker_1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://master:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_NO_DAEMONIZE=1
+      - SPARK_WORKER_MEMORY=1G
+    depends_on:
+      - master
+    networks:
+      - spark_network
+  worker_2:
+    image: spark:3.5.7
+    container_name: worker_2
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://master:7077
+      - SPARK_NO_DAEMONIZE=1
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
+    depends_on:
+      - master
+    networks:
+      - spark_network
+    
