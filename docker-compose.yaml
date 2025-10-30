@@ -1,9 +1,6 @@
 version: "3.8"
 
 networks:
-  # public: {}
-  # private:
-  #   internal: true
   spark_network:
     driver: bridge
 services:
@@ -19,6 +16,8 @@ services:
     command: ["/opt/spark/sbin/start-master.sh"]
     networks:
       - spark_network
+    volumes:
+      - ./data:/data:ro
   
   worker_1:
     image: spark:3.5.7
@@ -36,6 +35,8 @@ services:
       - 8081:8081
     networks:
       - spark_network
+    volumes:
+      - ./data:/data:ro
   worker_2:
     image: spark:3.5.7
     container_name: worker_2
@@ -52,4 +53,41 @@ services:
       - 8082:8082
     networks:
       - spark_network
-    
+    volumes:
+      - ./data:/data:ro  
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    command: server --address ":9000" --console-address ":9001" /data
+    environment:
+      - MINIO_ROOT_USER=minio
+      - MINIO_ROOT_PASSWORD=12345678
+    volumes:
+      - ./minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks: [spark_network]
+
+  mc:
+    image: minio/mc:latest
+    container_name: mc
+    depends_on:
+      - minio
+    networks: [spark_network]
+    volumes:
+      - ./data:/hostdata:ro
+    entrypoint: >
+      /bin/sh -c '
+        i=0;
+        until mc alias set local http://minio:9000 minio 12345678 >/dev/null 2>&1; do
+          i=$((i+1)); echo "waiting for minio... $i"; sleep 2;
+        done;
+        until mc ls local >/dev/null 2>&1; do
+          echo "minio not fully ready..."; sleep 2;
+        done;
+        mc mb -p local/bronze || true;
+        mc cp -r /hostdata/. local/bronze/ || true;
+        tail -f /dev/null
+      '
