@@ -78,11 +78,14 @@ services:
     networks: [spark_network]
     volumes:
       - ./data:/hostdata:ro
+    environment:
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
     entrypoint: >
       /bin/sh -c '
         i=0;
         until mc alias set local http://minio:9000 minio 12345678 >/dev/null 2>&1; do
-          i=$((i+1)); echo "waiting for minio... $i"; sleep 2;
+          i=$$((i+1)); echo "waiting for minio... $i"; sleep 2;
         done;
         until mc ls local >/dev/null 2>&1; do
           echo "minio not fully ready..."; sleep 2;
@@ -91,3 +94,13 @@ services:
         mc cp -r /hostdata/. local/bronze/ || true;
         tail -f /dev/null
       '
+  jupyter:
+    build: ./jupyter
+    ports: ["8888:8888"]
+    volumes: ["./notebooks:/work"]
+    working_dir: /work
+    command: >
+      jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+                  --IdentityProvider.token=dev
+    networks:
+      - spark_network
